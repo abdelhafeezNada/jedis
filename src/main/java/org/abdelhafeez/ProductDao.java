@@ -18,17 +18,18 @@ public class ProductDao {
     private static final String NAME_SPACE = "PRD";
 
     public ProductDao() {
-        // Connect to Redis server running on localhost
         this.jedis = new Jedis("localhost", 6379);
         this.mapper = new ObjectMapper();
     }
 
     public void saveProduct(Product product) throws JsonProcessingException {
+        Transaction trx = jedis.multi();
         Map<String, String> map = new HashMap<>();
         String key = NAME_SPACE + product.getId();
         String json = toJson(product);
         map.put(key, json);
-        jedis.hset(NAME_SPACE, map);
+        trx.hset(NAME_SPACE, map);
+        trx.exec();
     }
 
     public void saveAll(List<Product> list) throws JsonProcessingException {
@@ -41,17 +42,11 @@ public class ProductDao {
         Transaction trx = jedis.multi();
         trx.hmset(NAME_SPACE, map);
         trx.exec();
-        jedis.close();
     }
 
     public Product getProduct(Long id) throws JsonProcessingException {
-        // Generate the key for the product
         String key = NAME_SPACE + id;
-
-        // Retrieve the JSON string from Redis
         String json = jedis.get(key);
-
-        // Convert JSON string back to Product object
         return fromJson(json);
     }
 
@@ -66,22 +61,17 @@ public class ProductDao {
     }
 
     public void updateProduct(Product product) throws JsonProcessingException {
-        // Generate the key for the product
+
+        Map<String, String> map = new HashMap<>();
         String key = NAME_SPACE + product.getId();
-
-        // Convert the Product object to JSON
         String json = toJson(product);
-
-        // Update the JSON string in Redis
-        jedis.set(key, json);
+        map.put(key, json);
+        jedis.hset(NAME_SPACE, map);
     }
 
     public void deleteProduct(Long id) {
-        // Generate the key for the product
         String key = NAME_SPACE + id;
-
-        // Delete the product from Redis
-        jedis.del(key);
+        jedis.hdel(NAME_SPACE, key);
     }
 
     // Utility method to convert Product object to JSON string
